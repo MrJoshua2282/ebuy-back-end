@@ -1,23 +1,28 @@
-const uuid = require('uuid/dist/v4');
+const mongoose = require('mongoose');
 
+const Product = require('../models/products-model');
 const User = require('../models/users-model');
 const AppError = require('../errorHandler');
 
-exports.createUser = async (req, res, next) => {
+exports.signup = async (req, res, next) => {
     const { firstName, lastName, email, password } = req.body;
-    const existingUser = await User.findOne({ email: email });
-    console.log(existingUser)
+    let existingUser;
+    try {
+        existingUser = await User.findOne({ email: email });
+    } catch (error) {
+        return next(new AppError('Signing up failed. Please try again ', 500));
+    }
 
     if (existingUser) {
-        return next(new AppError('Email already exists. Please log in or try another email', 400));
+        return next(new AppError('User already exists. Please login instead', 422));
     }
 
     const createdUser = new User({
-        id: uuid,
         firstName,
         lastName,
         email,
         password,
+        products: []
     });
 
     try {
@@ -27,55 +32,128 @@ exports.createUser = async (req, res, next) => {
     }
 
     res.status(201).json({
-        status: 'successful',
-        user: createdUser
+        status: 'success',
+        user: createdUser.toObject({ getters: true })
     });
+}
+
+exports.login = async (req, res, next) => {
+    const { email, password } = req.body;
+    let existingUser;
+    try {
+        existingUser = await User.findOne({ email: email });
+    } catch (error) {
+        return next(new AppError('Logging in failed. Please try again ', 500));
+    }
+
+    if (!existingUser || existingUser.password !== password) return next(new AppError('Incorrect credentials, could not log you in', 401));
+
+    res.status(201).json({
+        message: 'logged in!',
+        user: existingUser.toObject({ getters: true })
+    })
+}
+
+exports.getAllUsers = async (req, res, next) => {
+    let users;
+    try {
+        users = await User.find({}, '-password');
+        // users = await User.find();
+    } catch (error) {
+        return next(new AppError('Fetching users failed. Please try again.', 500));
+    }
+
+    if (!users) return next(new AppError('No users found', 404));
+
+    res.status(201).json({
+        status: 'success',
+        users: users.map(user => user.toObject({ getters: true }))
+    })
 }
 
 exports.updateUser = async (req, res, next) => {
     const userId = req.params.userId;
-    const { firstName, lastName, email, password } = req.body;
+    const { firstName, lastName, email, password, newPassword } = req.body;
     let updatedUser;
-
-    try {
-        updatedUser = await User.findById(userId)
-    } catch (err) {
-        return next(new AppError('Fetching places failed. Please try again later', 500));
+    if (!email || !password) {
+        return next(new AppError('Incorrect credentials', 401));
     }
 
+    try {
+        updatedUser = await User.find({ email: email });
+    } catch (err) {
+        return next(new AppError('Fetching user failed. Please try again later', 500));
+    }
 
     if (!updatedUser) {
         return next(new AppError('No user with that id could be found', 404));
     }
 
-    if (firstName) updatedUser.firstName = firstName;
-    if (lastName) updatedUser.lastName = lastName;
-    if (email) updatedUser.email = email;
-    if (password) updatedUser.password = password;
+    if (updatedUser[0].password !== password) {
+        // console.log(updatedUser[0].firstName);
+        return next(new AppError(`Incorrect credentials`, 401));
+    }
+
+    if (firstName) updatedUser[0].firstName = firstName;
+    if (lastName) updatedUser[0].lastName = lastName;
+    // if (email) updatedUser.email = email;
+    if (newPassword) updatedUser[0].password = newPassword;
+    console.log(updatedUser[0].lastName)
 
     try {
-        await updatedUser.save();
+        await updatedUser[0].save();
     } catch (error) {
         return next(new AppError(`Wasn't able to update. Please try again later`, 500));
     }
-    res.status(200).json({ updatedUser: updatedUser.toObject({ getters: true }) });
+    res.status(200).json({ user: updatedUser.toObject({ getters: true }) });
 
 }
 
 exports.getUserById = async (req, res, next) => {
     const userId = req.params.userId;
-    const user = DUMMY_USER.find
-    console.log(user);
+    let user;
+    try {
+        user = await User.findById({ userId }, '-password');
+    } catch (error) {
+        return next(new AppError('No user with this id exists', 404));
+    }
+
     res.status(200).json({
+        status: 'success',
         user
     })
 }
 
 exports.deleteUser = async (req, res, next) => {
     const userId = req.params.userId;
-    if (!userId) {
-        return next(new AppError('No user with that id found', 404));
+    const { email, password } = req.body;
+    let user;
+    let products;
+
+    try {
+        // user = await User.findByIdAndDelete(userId);
+        user = await User.findById(userId);
+    } catch (error) {
+        return next(new AppError('Could not complete deletion, please try again later', 500));
     }
 
-    await userId.findById
+    if (!user || user.email !== email || user.password !== password) return next(new AppError('Incorrect credentials, please try again', 401))
+
+    // There are no images being used for users
+    // const imagePath = user.image;
+
+    try {
+        products = await Product.deleteMany({ creatorId: userId });
+        user = await User.findByIdAndDelete(userId);
+    } catch (err) {
+        return next(new AppError('Could not complete deletion, please try again later', 500));
+    }
+
+    // fs.unlink(imagePath, err => {
+    //     console.log(err);
+    //   });
+
+    res.status(204).json({
+        status: 'successfully deleted user'
+    })
 }
