@@ -1,29 +1,30 @@
 const mongoose = require('mongoose');
+const fs = require('fs');
 
 const Product = require('../models/products-model');
 const User = require('../models/users-model');
 const AppError = require('../errorHandler');
 
 exports.createProduct = async (req, res, next) => {
-    const { title, description, price, company, image, inventory, creatorId } = req.body;
+    const { title, description, price, company, inventory } = req.body;
+
     const product = new Product({
         title,
         description,
         price,
         company,
-        image: 'something',
+        image: req.file.path,
         inventory,
-        creatorId
-        // user: req.userData.userId
+        creatorId: req.userData.userId
     })
-    // console.log(creatorId)
+
 
     let theCreatorOfProduct;
 
     try {
-        theCreatorOfProduct = await User.findById(creatorId);
+        theCreatorOfProduct = await User.findById(req.userData.userId);
     } catch (error) {
-        return next(new AppError('Creating product failed. Please try again.', 500));
+        return next(new AppError('Creating product failed, please try again.', 500));
     }
 
     if (!theCreatorOfProduct) return next(new AppError('Could not find user for provided id.', 404));
@@ -104,9 +105,9 @@ exports.getAllProducts = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
     const prodId = req.params.prodId;
-    const { title, description, price, company, inventory, image, userId } = req.body
-    let product;
+    const { title, description, price, company, inventory } = req.body
 
+    let product;
     try {
         product = await Product.findById(prodId);
     } catch (error) {
@@ -116,23 +117,36 @@ exports.updateProduct = async (req, res, next) => {
     if (!product) {
         return next(new AppError('No product with this id exists'), 404);
     }
-
-    if (product.creatorId.toString() !== userId) {
+    // if (product.creatorId.toString() !== userId) 
+    if (product.creatorId.toString() !== req.userData.userId) {
         return next(new AppError('You are not allowed to edit this product', 401));
     }
-    TODO: //image ====>
-    // if (image) product.image = image
+    // console.log(req.file.path, 'updating product!')
+    if (req.file) {
+        // remove old image
+        fs.unlink(product.image, err => {
+            console.log(err);
+        });
+        // add new image
+        product.image = req.file.path
+    }
     if (title) product.title = title;
     if (description) product.description = description;
     if (price) product.price = price;
     if (company) product.company = company;
     if (inventory) product.inventory = inventory;
 
+    // const imagePath = product.image;
+
     try {
         await product.save();
     } catch (error) {
         return next(new AppError('Failed to successfully update product. Please try again'), 500);
     }
+
+    // fs.unlink(imagePath, err => {
+    //     console.log(err, 'ahhhh');
+    // });
 
     res.status(201).json({
         status: 'success',
@@ -142,7 +156,6 @@ exports.updateProduct = async (req, res, next) => {
 
 exports.deleteProduct = async (req, res, next) => {
     const prodId = req.params.prodId;
-    const { userId } = req.body;
 
     let product;
     try {
@@ -155,11 +168,11 @@ exports.deleteProduct = async (req, res, next) => {
         return next(new AppError('No document found with that ID', 404));
     }
 
-    if (product.creatorId.id !== userId) {
+    if (product.creatorId.id !== req.userData.userId) {
         return next(new AppError('You are not allowed to delete product', 401))
     }
-    TODO:
-    // const imagePath = product.image;
+
+    const imagePath = product.image;
 
     try {
         const sess = await mongoose.startSession();
@@ -172,9 +185,10 @@ exports.deleteProduct = async (req, res, next) => {
         return next(new AppError('Something went wrong, could not delete product', 500));
     }
 
-    // false.unlink(imagePath, err => {
-    //     console.log(err);
-    // });
+    fs.unlink(imagePath, err => {
+        console.log(err);
+    });
+
 
     res.status(204).json({ status: 'successfully deleted product' });
 }

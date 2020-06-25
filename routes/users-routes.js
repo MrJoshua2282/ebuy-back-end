@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const checkAuth = require('../middleware/check-auth');
 
 const usersController = require('../controllers/users-controller');
 
@@ -13,7 +14,7 @@ router.route('/login')
     .post(usersController.login)
 
 router.route('/update-user')
-    .patch(usersController.updateUser)
+    .patch(checkAuth, usersController.updateUser)
 
 router
     .route('/:userId')
@@ -21,6 +22,6 @@ router
 
 router
     .route('/delete-user/:userId')
-    .delete(usersController.deleteUser)
+    .delete(checkAuth, usersController.deleteUser)
 
 module.exports = router;

@@ -1,11 +1,16 @@
 const express = require('express');
-const router = express.Router();
 
 const productsController = require('../controllers/products-controller');
+const fileUpload = require('../middleware/file-upload');
+const checkAuth = require('../middleware/check-auth');
+
+const router = express.Router();
+
+// router.use(checkAuth)
 
 router
     .route('/')
-    .post(productsController.createProduct)
+    .post(checkAuth, fileUpload.single('image'), productsController.createProduct)
     .get(productsController.getAllProducts)
 
 router.get('/user-products/:userId', productsController.getAllProductsByUser)
@@ -13,9 +18,7 @@ router.get('/user-products/:userId', productsController.getAllProductsByUser)
 router
     .route('/:prodId')
     .get(productsController.getProductById)
-    .patch(productsController.updateProduct)
-    .delete(productsController.deleteProduct)
-
-
+    .patch(checkAuth, fileUpload.single('image'), productsController.updateProduct)
+    .delete(checkAuth, productsController.deleteProduct)
 
 module.exports = router;
