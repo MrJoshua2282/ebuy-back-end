@@ -43,7 +43,7 @@ exports.signup = async (req, res, next) => {
     let token;
     // put whatever information you need in the token for the front end
     try {
-        token = jwt.sign({ userId: createdUser.id, email: createdUser.email }, 'keep_quite_string', { expiresIn: '1h' })
+        token = jwt.sign({ userId: createdUser.id, email: createdUser.email }, process.env.JWT_KEY, { expiresIn: '1h' })
     } catch (error) {
         return next(new AppError('Creating user failed, please try again.', 500));
     }
@@ -64,7 +64,7 @@ exports.login = async (req, res, next) => {
     try {
         existingUser = await User.findOne({ email: email });
     } catch (error) {
-        return next(new AppError('Logging in failed. Please try again ', 500));
+        return next(new AppError('Logging in failed, please try again ', 500));
     }
     // if (!existingUser || existingUser.password !== password) 
     if (!existingUser) return next(new AppError('Incorrect credentials, could not log you in', 401));
@@ -83,7 +83,7 @@ exports.login = async (req, res, next) => {
     let token;
     // put whatever information you need in the token for the front end
     try {
-        token = jwt.sign({ userId: existingUser.id, email: existingUser.email }, 'keep_quite_string', { expiresIn: '1h' })
+        token = jwt.sign({ userId: existingUser.id, email: existingUser.email }, process.env.JWT_KEY, { expiresIn: '1h' })
     } catch (error) {
         return next(new AppError('Logging in failed, please try again.', 500));
     }
@@ -119,41 +119,69 @@ exports.updateUser = async (req, res, next) => {
     const userId = req.params.userId;
     const { firstName, lastName, email, password, newPassword } = req.body;
     let updatedUser;
-    if (!email || !password) {
-        return next(new AppError('Incorrect credentials', 401));
-    }
 
     try {
-        updatedUser = await User.find({ email: email });
+        updatedUser = await User.findOne({ email: email });
     } catch (err) {
-        return next(new AppError('Fetching user failed. Please try again later', 500));
+        return next(new AppError('Fetching user failed, please try again later', 500));
     }
 
     if (!updatedUser) {
         return next(new AppError('No user with that id could be found', 404));
     }
 
-    if (product.creatorId.toString() !== req.userData.userId) {
+    if (updatedUser.id !== req.userData.userId) {
         return next(new AppError('You are not allowed to edit this product', 401));
     }
 
-    if (updatedUser[0].password !== password) {
-        // console.log(updatedUser[0].firstName);
-        return next(new AppError(`Incorrect credentials`, 401));
+    let isValidPassword;
+    try {
+        isValidPassword = await bcrypt.compare(password, updatedUser.password);
+    } catch (error) {
+        return next(new AppError('Could not update user, please try again', 500));
     }
 
-    if (firstName) updatedUser[0].firstName = firstName;
-    if (lastName) updatedUser[0].lastName = lastName;
+    if (!isValidPassword) {
+        return next(new AppError('You are not allowed to edit this product', 401));
+    }
+
+
+    if (firstName) updatedUser.firstName = firstName;
+    if (lastName) updatedUser.lastName = lastName;
     // if (email) updatedUser.email = email;
-    if (newPassword) updatedUser[0].password = newPassword;
-    console.log(updatedUser[0].lastName)
+    if (newPassword) {
+        let hashedPassword;
+        try {
+            hashedPassword = await bcrypt.hash(newPassword, 12);
+        } catch (error) {
+            return next(new AppError('Could not update user, please try again', 500));
+        }
+        updatedUser.password = hashedPassword;
+    }
 
     try {
-        await updatedUser[0].save();
+        await updatedUser.save();
     } catch (error) {
-        return next(new AppError(`Wasn't able to update, please try again later`, 500));
+        return next(new AppError('Could not update user, please try again', 500));
     }
-    res.status(200).json({ user: updatedUser.toObject({ getters: true }) });
+
+    // res.status(200).json({ user: updatedUser.toObject({ getters: true }) });
+    let token;
+    // put whatever information you need in the token for the front end
+    try {
+        token = jwt.sign({ userId: updatedUser.id, email: updatedUser.email }, process.env.JWT_KEY, { expiresIn: '1h' })
+    } catch (error) {
+        return next(new AppError('Updating user failed, please try again.', 500));
+    }
+
+    res.status(201).json({
+        status: 'success',
+        userId: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        token: token
+        // user: createdUser.toObject({ getters: true })
+    });
 
 }
 
@@ -186,7 +214,14 @@ exports.deleteUser = async (req, res, next) => {
         return next(new AppError('Could not complete deletion, please try again later', 500));
     }
 
-    if (!user || user.email !== email || user.password !== password) return next(new AppError('Incorrect credentials, please try again', 401))
+    let isValidPassword;
+    try {
+        isValidPassword = await bcrypt.compare(password, user.password);
+    } catch (error) {
+        return next(new AppError('Could not log you in, please check your credentials and try again.', 500))
+    }
+
+    if (!user || user.email !== email || !isValidPassword) return next(new AppError('Could not log you in, please check your credentials and try again.', 401))
 
     // There are no images being used for users
     // const imagePath = user.image;

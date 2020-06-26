@@ -10,7 +10,7 @@ module.exports = (req, res, next) => {
         if (!token) {
             throw new Error('Not authenticated');
         }
-        const decodedToken = jwt.verify(token, 'keep_quite_string');
+        const decodedToken = jwt.verify(token, process.env.JWT_KEY);
         // dynamically add data to req
         req.userData = { userId: decodedToken.userId }
         next();
