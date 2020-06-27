@@ -15,6 +15,8 @@ router
 
 router.get('/user-products/:userId', productsController.getAllProductsByUser)
 
+router.patch('/update-many', productsController.updateMany);
+
 router
     .route('/:prodId')
     .get(productsController.getProductById)

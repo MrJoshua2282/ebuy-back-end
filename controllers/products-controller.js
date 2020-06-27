@@ -154,6 +154,31 @@ exports.updateProduct = async (req, res, next) => {
     })
 }
 
+exports.updateMany = async (req, res, next) => {
+    const { newObj } = req.body;
+
+    if (newObj.length === 0) {
+        return next(new AppError('There are no products to be updated', 404));
+    }
+
+    let arr;
+    try {
+        const getData = async () => {
+            arr = newObj.map(async (el) => await Product.findByIdAndUpdate(el.id, { inventory: el.newInventory }));
+            await Promise.all(arr);
+        }
+        getData();
+
+    } catch (error) {
+        return next(new AppError('Could not complete update'));
+    }
+
+    res.status(201).json({
+        status: 'success',
+        products: arr
+    })
+}
+
 exports.deleteProduct = async (req, res, next) => {
     const prodId = req.params.prodId;
 
