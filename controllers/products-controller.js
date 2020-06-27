@@ -121,7 +121,7 @@ exports.updateProduct = async (req, res, next) => {
     if (product.creatorId.toString() !== req.userData.userId) {
         return next(new AppError('You are not allowed to edit this product', 401));
     }
-    // console.log(req.file.path, 'updating product!')
+
     if (req.file) {
         // remove old image
         fs.unlink(product.image, err => {

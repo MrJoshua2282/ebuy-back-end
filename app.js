@@ -50,6 +50,3 @@ mongoose
     }).catch(err => {
         console.log(err);
     });
-
-// app.listen(5000 || 5001);
-

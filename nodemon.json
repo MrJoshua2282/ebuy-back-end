@@ -3,6 +3,7 @@
         "DB_PSW": "KAMrbSEWn269ekJp",
         "DB_USER": "user-ebuy",
         "DB_NAME": "ebuyDb",
-        "JWT_KEY": "keep-quiet-string-por-favor"
+        "JWT_KEY": "keep-quiet-string-por-favor",
+        "PORT": 5000
     }
 }
