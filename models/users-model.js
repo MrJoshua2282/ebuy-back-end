@@ -10,7 +10,6 @@ const userSchema = new Schema({
     password: { type: String, required: [true, 'user must have a password'] },
     products: [{ type: mongoose.Types.ObjectId, required: true, ref: 'Product' }]
 });
-
 userSchema.plugin(uniqueValidator);
 
 module.exports = mongoose.model('User', userSchema);
